@@ -1,4 +1,4 @@
-from imports import tf, NoDependency
+from imports import tf, NoDependency, skvid_io, np
 from conv2dmhaunit import Conv2DMHAUnit
 
 def bidirectional_conv_lstm_attention_bottleneck_model(
@@ -35,12 +35,15 @@ def bidirectional_conv_lstm_attention_bottleneck_model(
 	curr_image_dims = image_dims
 	# curr_image_size = curr_image_dims["0"] * curr_image_dims["1"]
 
-	prev_x = tf.keras.layers.Input(shape = (seq_len_prev_and_after,) + (image_dims["0"], image_dims["1"], image_dims["2"]))
-	after_x = tf.keras.layers.Input(shape = (seq_len_prev_and_after,) + (image_dims["0"], image_dims["1"], image_dims["2"]))
+	prev_input = tf.keras.layers.Input(shape = (seq_len_prev_and_after,) + (image_dims["0"], image_dims["1"], image_dims["2"]))
+	after_input = tf.keras.layers.Input(shape = (seq_len_prev_and_after,) + (image_dims["0"], image_dims["1"], image_dims["2"]))
+
+	prev_x = prev_input
+	after_x = after_input
 
 	for i in range(num_unet_sections):	
-		prev_x = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = True)(prev_x)
-		after_x = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = True)(after_x)
+		prev_x = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = True, padding = "same")(prev_x)
+		after_x = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = True, padding = "same")(after_x)
 		combined_x = tf.reduce_sum(tf.concat([prev_x, after_x], axis = -1), axis = -4) / tf.cast((d_model * 2) ** .5, tf.float32)
 		residual_tensors.append(combined_x)
 		prev_x = tf.keras.layers.MaxPool3D((1, 2, 2))(prev_x)
@@ -48,8 +51,8 @@ def bidirectional_conv_lstm_attention_bottleneck_model(
 		curr_image_dims["0"] = curr_image_dims["0"] // 2
 		curr_image_dims["1"] = curr_image_dims["1"] // 2
 
-	prev_conv = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = False)(prev_x)
-	after_conv = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = False)(after_x)
+	prev_conv = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = False, padding = "same")(prev_x)
+	after_conv = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = False, padding = "same")(after_x)
 
 	"""
 	* * * a
@@ -128,10 +131,33 @@ def bidirectional_conv_lstm_attention_bottleneck_model(
 		att_upsample = tf.keras.layers.Conv2D(
 			d_model,
 			unet_upsample_kernel,
-			activation = activation
+			activation = activation,
+			padding = "same"
 			)(residual_added_att)
 	
-	final_conv_prediction = tf.keras.layers.Conv2D(3, unet_upsample_kernel, activation = prediction_activation)
+	final_conv_prediction = tf.keras.layers.Conv2D(3, unet_upsample_kernel, activation = prediction_activation, padding = "same")(att_upsample)
 
-	return final_conv_prediction
+	return tf.keras.models.Model(inputs = [prev_input, after_input], outputs = final_conv_prediction) 
+
+def frame_masking(frames, num_elements_front_and_back = 3):
+	X = []
+	y = []
+	for i in range(num_elements_front_and_back, len(frames) - num_elements_front_and_back):
+
+		previous_frames = frames[i-num_elements_front_and_back:i]
+
+		# after frames specifically ordered to go from future to present (in that direction)
+		after_frames = frames[i+num_elements_front_and_back:i:-1]
+		X.append((previous_frames, after_frames))
+		y.append(frames[i])
+
+	return np.array(X), np.array(y)
+
+def data_loader(video_path, num_elements_front_and_back = 3):
+	video_data = skvid_io.vread(video_path)
+	video_data_numpy = np.array(video_data)
+	print(video_data_numpy.shape)
+	X, y = frame_masking(video_data_numpy, num_elements_front_and_back=num_elements_front_and_back)
+	return X, y
+
 
