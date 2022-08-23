@@ -32,7 +32,7 @@ class Conv2DMHAUnit(tf.keras.layers.Layer):
 
 		self.y_pad_length = 0
 
-		self.x_pad_length = 0;
+		self.x_pad_length = 0
 
 		if not self.y_complete:
 

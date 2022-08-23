@@ -141,7 +141,7 @@ def bidirectional_conv_lstm_attention_bottleneck_model(
 def bidir_model_build(hp):
 
 	# overall parameters
-	conv_attention_or_conv = hp.Choice("CONV_ATTENTION_OR_CONV", ["attention", "conv"])
+	# conv_attention_or_conv = hp.Choice("CONV_ATTENTION_OR_CONV", ["conv", "attention"])
 	d_model = hp.Fixed("D_MODEL", 64)
 	num_unet_sections = hp.Int("NUM_UNET_SECTIONS", 2, 5, step = 1)
 	num_layers_attention = hp.Int("NUM_LAYERS_ATTENTION", 1, 3, step = 1)
@@ -202,79 +202,79 @@ def bidir_model_build(hp):
 	prev_conv = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = False, padding = "same")(prev_x)
 	after_conv = tf.keras.layers.ConvLSTM2D(d_model, convlstm_kernel_size, activation = activation, return_sequences = False, padding = "same")(after_x)
 
-	with hp.conditional_scope("CONV_ATTENTION_OR_CONV", ["attention"]):
-		if conv_attention_or_conv == "attention":
+	# with hp.conditional_scope("CONV_ATTENTION_OR_CONV", ["attention"]):
+	# 	if conv_attention_or_conv == "attention":
 
-			"""
-			* * * a
-			* * * *
-			p * * *
+	# 		"""
+	# 		* * * a
+	# 		* * * *
+	# 		p * * *
 
-			|
-			V
+	# 		|
+	# 		V
 
-			* | * | * | a
-			* | * | * | *
-			* | * | * | *
-			p | * | * | *
-			"""
+	# 		* | * | * | a
+	# 		* | * | * | *
+	# 		* | * | * | *
+	# 		p | * | * | *
+	# 		"""
 
-			channels = tf.shape(prev_conv)[-1]
+	# 		channels = tf.shape(prev_conv)[-1]
 
-			attention_bottleneck_block_width = tf.shape(prev_conv)[-2]
+	# 		attention_bottleneck_block_width = tf.shape(prev_conv)[-2]
 
-			attention_bottleneck_block_height = tf.shape(prev_conv)[-3]
+	# 		attention_bottleneck_block_height = tf.shape(prev_conv)[-3]
 
-			curr_image_dims["0"] = curr_image_dims["0"] * (attention_bottleneck_multiple + 2)
-			curr_image_dims["1"] = curr_image_dims["1"] * (attention_bottleneck_multiple + 2)
+	# 		curr_image_dims["0"] = curr_image_dims["0"] * (attention_bottleneck_multiple + 2)
+	# 		curr_image_dims["1"] = curr_image_dims["1"] * (attention_bottleneck_multiple + 2)
 
-			b = tf.shape(prev_conv)[0]
+	# 		b = tf.shape(prev_conv)[0]
 
-			vert_cols = []
+	# 		vert_cols = []
 
-			vert_strip_prev = tf.zeros((b, (attention_bottleneck_multiple + 1) * attention_bottleneck_block_height, attention_bottleneck_block_width, channels))
+	# 		vert_strip_prev = tf.zeros((b, (attention_bottleneck_multiple + 1) * attention_bottleneck_block_height, attention_bottleneck_block_width, channels))
 
-			vert_col_prev = tf.concat([vert_strip_prev, prev_conv], axis = -3)
+	# 		vert_col_prev = tf.concat([vert_strip_prev, prev_conv], axis = -3)
 
-			vert_cols.append(vert_col_prev)
+	# 		vert_cols.append(vert_col_prev)
 
-			for i in range(attention_bottleneck_multiple):
+	# 		for i in range(attention_bottleneck_multiple):
 				
-				vert_strip = tf.zeros((b, (attention_bottleneck_multiple + 2) * attention_bottleneck_block_height, attention_bottleneck_block_width, channels))
+	# 			vert_strip = tf.zeros((b, (attention_bottleneck_multiple + 2) * attention_bottleneck_block_height, attention_bottleneck_block_width, channels))
 
-				vert_cols.append(vert_strip)
+	# 			vert_cols.append(vert_strip)
 			
-			vert_strip_after = tf.zeros((b, (attention_bottleneck_multiple + 1) * attention_bottleneck_block_height, attention_bottleneck_block_width, channels))
+	# 		vert_strip_after = tf.zeros((b, (attention_bottleneck_multiple + 1) * attention_bottleneck_block_height, attention_bottleneck_block_width, channels))
 
-			vert_col_after = tf.concat([after_conv, vert_strip_after], axis = -3)
+	# 		vert_col_after = tf.concat([after_conv, vert_strip_after], axis = -3)
 
-			vert_cols.append(vert_col_after)
+	# 		vert_cols.append(vert_col_after)
 
-			attention_bottleneck = tf.concat(vert_cols, axis = -2)
+	# 		attention_bottleneck = tf.concat(vert_cols, axis = -2)
 
-			for i in range(num_layers_attention):
+	# 		for i in range(num_layers_attention):
 
-				attention_bottleneck = Conv2DMHAUnit(
-					num_heads = num_heads,
-					d_model = d_model,
-					image_size = NoDependency((image_dims_0, image_dims_1)),
-					kernel_size = (attention_kernel_size, attention_kernel_size),
-					name = f"Conv2DMHAUnit_{i}",
-					feature_activation = attention_feature_activation,
-					output_activation = attention_output_activation
-				)(attention_bottleneck)
+	# 			attention_bottleneck = Conv2DMHAUnit(
+	# 				num_heads = num_heads,
+	# 				d_model = d_model,
+	# 				image_size = NoDependency((image_dims_0, image_dims_1)),
+	# 				kernel_size = (attention_kernel_size, attention_kernel_size),
+	# 				name = f"Conv2DMHAUnit_{i}",
+	# 				feature_activation = attention_feature_activation,
+	# 				output_activation = attention_output_activation
+	# 			)(attention_bottleneck)
 			
-			prev_attention = attention_bottleneck[..., (attention_bottleneck_multiple + 1) * attention_bottleneck_block_height:, :attention_bottleneck_block_width, :]
+	# 		prev_attention = attention_bottleneck[..., (attention_bottleneck_multiple + 1) * attention_bottleneck_block_height:, :attention_bottleneck_block_width, :]
 
-			after_attention = attention_bottleneck[..., :attention_bottleneck_block_height, (attention_bottleneck_multiple + 1) * attention_bottleneck_block_width:, :]
+	# 		after_attention = attention_bottleneck[..., :attention_bottleneck_block_height, (attention_bottleneck_multiple + 1) * attention_bottleneck_block_width:, :]
 
-			concatted_attention = tf.concat([prev_attention, after_attention], axis = -1)
+	# 		concatted_attention = tf.concat([prev_attention, after_attention], axis = -1)
 
-			image_upsample = concatted_attention
+	# 		image_upsample = concatted_attention
 
-	with hp.conditional_scope("CONV_ATTENTION_OR_CONV", ["conv"]):
-		if conv_attention_or_conv == "conv":
-			image_upsample = tf.concat([prev_conv, after_conv], axis = -1)
+	# with hp.conditional_scope("CONV_ATTENTION_OR_CONV", ["conv"]):
+	# 	if conv_attention_or_conv == "conv":
+	image_upsample = tf.concat([prev_conv, after_conv], axis = -1)
 
 	for i in range(num_unet_sections):
 		image_upsample = tf.keras.layers.UpSampling2D()(image_upsample)
@@ -293,7 +293,7 @@ def bidir_model_build(hp):
 
 
 
-	opt = tf.keras.optimizers.Adam(lr = learning_rate)
+	opt = tf.keras.optimizers.Adam(learning_rate = learning_rate)
 
 	m.compile(
 		loss = ssim_loss,
@@ -306,7 +306,7 @@ def bidir_model_build(hp):
 def build_tuner(name, dir, max_epochs):
 	tuner = kt.Hyperband(
 		bidir_model_build,
-		objective = "val_ssim_metric",
+		objective = kt.Objective("val_loss", direction = "min"),
 		max_epochs = max_epochs,
 		directory = dir,
 		project_name = name
