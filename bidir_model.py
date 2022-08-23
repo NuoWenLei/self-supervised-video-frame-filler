@@ -149,11 +149,14 @@ def bidir_model_build(hp):
 	# conv lstm parameters
 	convlstm_kernel_size = hp.Int("CONVLSTM_KERNEL_SIZE", 3, 7, step = 2)
 	activation = hp.Choice("CONVLSTM_ACTIVATION", ["relu", "tanh", "sigmoid"])
-	image_dims = hp.Fixed("IMAGE_DIMS", {
-		"0": 128,
-		"1": 128,
-		"2": 3
-	})
+	image_dims_0 = hp.Fixed("IMAGE_DIMS_0", 128)
+	image_dims_1 = hp.Fixed("IMAGE_DIMS_1", 128)
+	image_dims_2 = hp.Fixed("IMAGE_DIMS_2", 3)
+	# image_dims = hp.Fixed("IMAGE_DIMS", {
+	# 	"0": 128,
+	# 	"1": 128,
+	# 	"2": 3
+	# })
 	seq_len_prev_and_after = hp.Fixed("SEQ_LEN_PREV_AND_AFTER", 3)
 
 	# attention bottleneck parameters
@@ -173,11 +176,15 @@ def bidir_model_build(hp):
 	residual_tensors = []
 
 	# init variables to keep track of image dimension and size
-	curr_image_dims = image_dims
+	curr_image_dims = {
+		"0": image_dims_0,
+		"1": image_dims_1,
+		"2": image_dims_2
+	}
 	# curr_image_size = curr_image_dims["0"] * curr_image_dims["1"]
 
-	prev_input = tf.keras.layers.Input(shape = (seq_len_prev_and_after,) + (image_dims["0"], image_dims["1"], image_dims["2"]))
-	after_input = tf.keras.layers.Input(shape = (seq_len_prev_and_after,) + (image_dims["0"], image_dims["1"], image_dims["2"]))
+	prev_input = tf.keras.layers.Input(shape = (seq_len_prev_and_after,) + (curr_image_dims["0"], curr_image_dims["1"], curr_image_dims["2"]))
+	after_input = tf.keras.layers.Input(shape = (seq_len_prev_and_after,) + (curr_image_dims["0"], curr_image_dims["1"], curr_image_dims["2"]))
 
 	prev_x = prev_input
 	after_x = after_input
@@ -250,7 +257,7 @@ def bidir_model_build(hp):
 				attention_bottleneck = Conv2DMHAUnit(
 					num_heads = num_heads,
 					d_model = d_model,
-					image_size = NoDependency((image_dims["0"], image_dims["1"])),
+					image_size = NoDependency((image_dims_0, image_dims_1)),
 					kernel_size = (attention_kernel_size, attention_kernel_size),
 					name = f"Conv2DMHAUnit_{i}",
 					feature_activation = attention_feature_activation,
