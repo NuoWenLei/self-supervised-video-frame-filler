@@ -1,5 +1,6 @@
-from imports import tf, NoDependency
+from imports import tf, NoDependency, kt
 from conv2dmhaunit import Conv2DMHAUnit
+from utils import ssim_loss, ssim_metric
 
 def bidirectional_conv_lstm_attention_bottleneck_model(
 	# overall parameters
@@ -166,6 +167,9 @@ def bidir_model_build(hp):
 	unet_upsample_kernel = hp.Int("UPSAMPLE_KERNEL_SIZE", 3, 7, step = 2)
 	prediction_activation = hp.Choice("ATTENTION_FEATURE_ACTIVATION", ["tanh", "sigmoid", "linear"])
 
+	# Optimizer param
+	learning_rate = hp.Choice("LEARNING_RATE", [1e-04, 1e-03, 1e-02])
+
 	residual_tensors = []
 
 	# init variables to keep track of image dimension and size
@@ -278,6 +282,31 @@ def bidir_model_build(hp):
 	
 	final_conv_prediction = tf.keras.layers.Conv2DTranspose(3, unet_upsample_kernel, activation = prediction_activation, padding = "same")(image_upsample)
 
-	return tf.keras.models.Model(inputs = [prev_input, after_input], outputs = final_conv_prediction) 
+	m = tf.keras.models.Model(inputs = [prev_input, after_input], outputs = final_conv_prediction)
+
+
+
+	opt = tf.keras.optimizers.Adam(lr = learning_rate)
+
+	m.compile(
+		loss = ssim_loss,
+		optimizer = opt,
+		metrics = [ssim_metric, "accuracy", "mse"]
+	)
+
+	return m
+
+def build_tuner(name, dir, max_epochs):
+	tuner = kt.Hyperband(
+		bidir_model_build,
+		objective = "val_ssim_metric",
+		max_epochs = max_epochs,
+		directory = dir,
+		project_name = name
+	)
+
+	print(tuner.search_space_summary())
+
+	return tuner
 
 
