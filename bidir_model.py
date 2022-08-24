@@ -170,7 +170,7 @@ def bidir_model_build(hp):
 
 	# UNet Upsample parameters
 	unet_upsample_kernel = hp.Int("UPSAMPLE_KERNEL_SIZE", 3, 7, step = 2)
-	prediction_activation = hp.Choice("ATTENTION_FEATURE_ACTIVATION", ["tanh", "sigmoid", "linear"])
+	prediction_activation = hp.Choice("PREDICTION_ACTIVATION", ["tanh", "sigmoid", "linear", "relu"])
 
 	# Optimizer param
 	learning_rate = hp.Choice("LEARNING_RATE", [1e-04, 1e-03, 1e-02])
